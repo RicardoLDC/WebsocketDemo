@@ -1,5 +1,6 @@
 package com.m4399.websocketdemo;
 
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.webkit.WebChromeClient;
@@ -10,10 +11,12 @@ import android.widget.FrameLayout;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
+import java.net.URI;
+
 public class MainActivity extends AppCompatActivity
 {
-//    private static final String HOST = "https://blog.csdn.net/weixin_34274029/article/details/87961352";
-    private static final String HOST = "http://localhost:8888";
+    private static final String HOST = "https://blog.csdn.net/weixin_34274029/article/details/87961352";
+//    private static final String HOST = "ws://echo.websocket.org";
 
     private static final int PORT_NUMBER = 8888;
 
@@ -69,9 +72,9 @@ public class MainActivity extends AppCompatActivity
 
         mWebView.loadUrl(HOST);
 
-        SettingProxy.setProxy(mWebView, HOST, PORT_NUMBER, "com.m4399.WebsocketDemo");
+//        SettingProxy.setProxy(mWebView, "ws://echo.websocket.org", PORT_NUMBER, "com.m4399.WebsocketDemo");
 
-        WebSocketHandler.getInstance("http://115.182.10.20:8888").connect();
+        WebSocketHandler.getInstance("ws://echo.websocket.org").connect();
 
         mFlContainer.addView(mWebView);
     }

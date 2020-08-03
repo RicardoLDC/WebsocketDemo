@@ -62,10 +62,11 @@ public class WebSocketHandler extends WebSocketListener
     public void connect()
     {
         //构造request对象
-        Request request = new Request.Builder().url(wsUrl)
+        Request request = new Request.Builder().url("ws://echo.websocket.org")
                                                .build();
 
         webSocket = client.newWebSocket(request, this);
+        client.dispatcher().executorService().shutdown();
         status = ConnectStatus.Connecting;
     }
 
@@ -105,6 +106,7 @@ public class WebSocketHandler extends WebSocketListener
     @Override
     public void onOpen(WebSocket webSocket, Response response)
     {
+        webSocket.send("test data");
         super.onOpen(webSocket, response);
         log("onOpen");
         this.status = ConnectStatus.Open;
@@ -129,12 +131,14 @@ public class WebSocketHandler extends WebSocketListener
     public void onMessage(WebSocket webSocket, ByteString bytes)
     {
         super.onMessage(webSocket, bytes);
+        log("bytes = " + bytes);
     }
 
     @Override
     public void onClosing(WebSocket webSocket, int code, String reason)
     {
         super.onClosing(webSocket, code, reason);
+        close();
         this.status = ConnectStatus.Closing;
         log("onClosing");
     }
