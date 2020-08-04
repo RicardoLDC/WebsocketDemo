@@ -1,4 +1,4 @@
-package com.m4399.websocketdemo;
+package com.m4399.websocketdemo.constants;
 
 /**
  * Project Name: WebsocketDemo
@@ -12,7 +12,8 @@ package com.m4399.websocketdemo;
  *
  * Copyright (c) 2020年, 4399 Network CO.ltd. All Rights Reserved.
  */
-public enum ConnectStatus {
+public enum ConnectStatus
+{
     Connecting, // the initial state of each web socket.
     Open, // the web socket has been accepted by the remote peer
     Closing, // one of the peers on the web socket has initiated a graceful shutdown

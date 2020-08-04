@@ -1,4 +1,4 @@
-package com.m4399.websocketdemo;
+package com.m4399.websocketdemo.interfaces;
 
 /**
  * Project Name: WebsocketDemo

@@ -2,6 +2,11 @@ package com.m4399.websocketdemo;
 
 import android.util.Log;
 
+import com.m4399.websocketdemo.constants.ConnectStatus;
+import com.m4399.websocketdemo.interfaces.WebSocketCallBack;
+
+import java.util.concurrent.TimeUnit;
+
 import androidx.annotation.Nullable;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -26,13 +31,18 @@ public class WebSocketHandler extends WebSocketListener
 {
     private static final String TAG = "WebSocketHandler";
 
-    private String wsUrl = "local://192.168.50.190";
+    private String wsUrl;
 
     private WebSocket webSocket;
 
     private ConnectStatus status;
 
-    private OkHttpClient client = new OkHttpClient.Builder().build();
+    private OkHttpClient client = new OkHttpClient.Builder()
+                                                  .readTimeout(3, TimeUnit.SECONDS)
+                                                  .writeTimeout(3, TimeUnit.SECONDS)
+                                                  .connectTimeout(3, TimeUnit.SECONDS)
+                                                  .pingInterval(40, TimeUnit.SECONDS)
+                                                  .build();
 
     private WebSocketHandler(String wsUrl)
     {
@@ -62,37 +72,13 @@ public class WebSocketHandler extends WebSocketListener
     public void connect()
     {
         //构造request对象
-        Request request = new Request.Builder().url("ws://echo.websocket.org")
-                                               .build();
+        Request request = new Request.Builder().url(wsUrl).build();
 
-        webSocket = client.newWebSocket(request, this);
+        webSocket = client.newWebSocket(request, WebSocketHandler.this);
+
         client.dispatcher().executorService().shutdown();
+
         status = ConnectStatus.Connecting;
-    }
-
-    public void reConnect()
-    {
-        if (webSocket != null)
-        {
-            webSocket = client.newWebSocket(webSocket.request(), this);
-        }
-    }
-
-    public void send(String text)
-    {
-        if (webSocket != null)
-        {
-            log("send： " + text);
-            webSocket.send(text);
-        }
-    }
-
-    public void cancel()
-    {
-        if (webSocket != null)
-        {
-            webSocket.cancel();
-        }
     }
 
     public void close()
@@ -106,7 +92,6 @@ public class WebSocketHandler extends WebSocketListener
     @Override
     public void onOpen(WebSocket webSocket, Response response)
     {
-        webSocket.send("test data");
         super.onOpen(webSocket, response);
         log("onOpen");
         this.status = ConnectStatus.Open;
