@@ -6,7 +6,7 @@ android {
     useLibrary 'org.apache.http.legacy'
     defaultConfig {
         applicationId "com.m4399.websocketdemo"
-        minSdkVersion 14
+        minSdkVersion 21
         targetSdkVersion 26
         versionCode 1
         versionName "1.0"

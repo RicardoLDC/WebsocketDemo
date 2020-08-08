@@ -14,9 +14,29 @@ package com.m4399.websocketdemo;
  */
 public class Application extends android.app.Application
 {
+    private static Application mInstance;
+
+    public static Application getInstance()
+    {
+        synchronized (Application.class)
+        {
+            if (mInstance == null)
+            {
+                mInstance = new Application();
+            }
+        }
+
+        return mInstance;
+    }
+
     @Override
     public void onCreate()
     {
         super.onCreate();
+    }
+
+    public String getClassName()
+    {
+        return getClass().getName();
     }
 }
