@@ -38,9 +38,9 @@ public class WebSocketHandler extends WebSocketListener
     private ConnectStatus status;
 
     private OkHttpClient client = new OkHttpClient.Builder()
-                                                  .readTimeout(3, TimeUnit.SECONDS)
-                                                  .writeTimeout(3, TimeUnit.SECONDS)
-                                                  .connectTimeout(3, TimeUnit.SECONDS)
+                                                  .readTimeout(10, TimeUnit.SECONDS)
+                                                  .writeTimeout(10, TimeUnit.SECONDS)
+                                                  .connectTimeout(10, TimeUnit.SECONDS)
                                                   .pingInterval(40, TimeUnit.SECONDS)
                                                   .build();
 
@@ -64,9 +64,9 @@ public class WebSocketHandler extends WebSocketListener
         return INST;
     }
 
-    public ConnectStatus getStatus()
+    public WebSocket getWebSocket()
     {
-        return status;
+        return webSocket;
     }
 
     public void connect()
@@ -74,7 +74,7 @@ public class WebSocketHandler extends WebSocketListener
         //构造request对象
         Request request = new Request.Builder().url(wsUrl).build();
 
-        webSocket = client.newWebSocket(request, WebSocketHandler.this);
+        client.newWebSocket(request, WebSocketHandler.this);
 
         client.dispatcher().executorService().shutdown();
 
@@ -92,8 +92,12 @@ public class WebSocketHandler extends WebSocketListener
     @Override
     public void onOpen(WebSocket webSocket, Response response)
     {
-        super.onOpen(webSocket, response);
-        log("onOpen");
+//        super.onOpen(webSocket, response);
+        log("WebSocket onOpen");
+
+        webSocket.send("hello world");
+        webSocket.send("welcome");
+        webSocket.close(1000, "再见");
         this.status = ConnectStatus.Open;
         if (mSocketIOCallBack != null)
         {
@@ -104,8 +108,8 @@ public class WebSocketHandler extends WebSocketListener
     @Override
     public void onMessage(WebSocket webSocket, String text)
     {
-        super.onMessage(webSocket, text);
-        log("onMessage: " + text);
+//        super.onMessage(webSocket, text);
+        log("WebSocket onMessage: " + text);
         if (mSocketIOCallBack != null)
         {
             mSocketIOCallBack.onMessage(text);
@@ -116,23 +120,23 @@ public class WebSocketHandler extends WebSocketListener
     public void onMessage(WebSocket webSocket, ByteString bytes)
     {
         super.onMessage(webSocket, bytes);
-        log("bytes = " + bytes);
+        log("WebSocket bytes = " + bytes);
     }
 
     @Override
     public void onClosing(WebSocket webSocket, int code, String reason)
     {
         super.onClosing(webSocket, code, reason);
-        close();
+//        close();
         this.status = ConnectStatus.Closing;
-        log("onClosing");
+        log("WebSocket onClosing");
     }
 
     @Override
     public void onClosed(WebSocket webSocket, int code, String reason)
     {
         super.onClosed(webSocket, code, reason);
-        log("onClosed");
+        log("WebSocket onClosed");
         this.status = ConnectStatus.Closed;
         if (mSocketIOCallBack != null)
         {
@@ -144,7 +148,7 @@ public class WebSocketHandler extends WebSocketListener
     public void onFailure(WebSocket webSocket, Throwable t, @Nullable Response response)
     {
         super.onFailure(webSocket, t, response);
-        log("onFailure: " + t.toString());
+        log("WebSocket onFailure: " + t.toString());
         t.printStackTrace();
         this.status = ConnectStatus.Canceled;
         if (mSocketIOCallBack != null)
@@ -167,6 +171,6 @@ public class WebSocketHandler extends WebSocketListener
 
     private void log(String text)
     {
-        Log.d("ldc", text);
+        Log.d("Ricardo", text);
     }
 }

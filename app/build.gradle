@@ -12,6 +12,13 @@ android {
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
+
+    // other configuration...
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
     buildTypes {
         release {
             minifyEnabled false
@@ -30,4 +37,8 @@ dependencies {
     implementation 'org.apache:apache:23'
     implementation 'com.squareup.okhttp3:okhttp:3.11.0'
     implementation files('libs/tbs_sdk.jar')
+    implementation 'com.squareup.okhttp3:logging-interceptor:3.5.0'
+
+    debugImplementation 'com.github.nongdenchet:networkproxy:0.7.0'
+    releaseImplementation 'com.github.nongdenchet:networkproxy-no-op:0.7.0'
 }
