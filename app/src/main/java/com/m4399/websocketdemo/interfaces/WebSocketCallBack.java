@@ -1,5 +1,7 @@
 package com.m4399.websocketdemo.interfaces;
 
+import okio.ByteString;
+
 /**
  * Project Name: WebsocketDemo
  * File Name:    WebSocketCallBack.java
@@ -18,6 +20,8 @@ public interface WebSocketCallBack
     void onOpen();
 
     void onMessage(String msg);
+
+    void onMessage(ByteString msg);
 
     void onClose();
 

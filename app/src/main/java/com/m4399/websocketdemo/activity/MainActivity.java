@@ -17,13 +17,15 @@ import android.widget.FrameLayout;
 import com.m4399.websocketdemo.R;
 import com.m4399.websocketdemo.WebSocketHandler;
 import com.m4399.websocketdemo.interfaces.WebSocketCallBack;
+import com.m4399.websocketdemo.utils.JSONUtils;
+import com.m4399.websocketdemo.utils.LogUtils;
 
-import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.TimeUnit;
 
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
@@ -33,6 +35,9 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
 import okhttp3.logging.HttpLoggingInterceptor;
+import okio.ByteString;
+
+import static com.m4399.websocketdemo.utils.JSONUtils.parseJSONObjectFromString;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener
 {
@@ -53,6 +58,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     private WebSocketHandler mWebSocketReceiveHandler;
 
+    private LocalSocket localSocket;
+
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @Override
     protected void onCreate(Bundle savedInstanceState)
@@ -63,6 +70,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         initView();
     }
+
+    private boolean isFirstTime = true;
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     private void initView()
@@ -108,49 +117,102 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                 try
                 {
+                    String name = "webview_devtools_remote_" + Process.myPid();
+
+                    localSocket = new LocalSocket();
+
+                    localSocket.connect(new LocalSocketAddress(name));
+
+                    Log.d("Ricardo", "localsocket 建立LocalSocket链接");
+
                     ServerSocket mServerSocket = new ServerSocket(PORT_NUMBER);
 
                     while (true)
                     {
                         Socket socket = mServerSocket.accept();
 
-                        byte[] bytes = new byte[512];
-
-                        socket.getInputStream().read(bytes);
-
                         Log.d("Ricardo", "tcp 建立链接");
 
-                        String input = new String(bytes);
+                        byte[] bytes = new byte[512];
 
-                        Log.d("Ricardo", "String:" + input);
+                        int bytesRead;
 
-                        Log.d("Ricardo", Process.myPid() + "");
+                        int fileSize = 0;
 
-                        if (input.contains("websocket"))
+//                        while ((bytesRead = socket.getInputStream().read(bytes)) != -1)
+//                        {
+//                            localSocket.getOutputStream().write(bytes, 0, bytesRead);
+//
+//                            Log.d("Ricardo", "localsocket 建立ws request bytesRead:" + bytesRead);
+//
+//                            fileSize += bytesRead;
+//                        }
+
+
+                        int size= socket.getInputStream().read(bytes);
+
+                        byte[] result=new byte[size];
+
+                        for (int i = 0; i < size; i ++)
                         {
-                            new Thread()
+                            result[i] = bytes[i];
+                        }
+
+                        localSocket.getOutputStream().write(result);
+
+//                        Log.d("Ricardo", "localsocket 建立ws request size:" + fileSize);
+//
+//                        if (fileSize == 0)
+//                        {
+//                            return;
+//                        }
+
+                        new Thread()
+                        {
+                            @Override
+                            public void run()
                             {
-                                @Override
-                                public void run()
+                                while (true)
                                 {
-                                    connectToWebViewWebsocket(bytes, socket);
+                                    try
+                                    {
+                                        byte[] buffer = new byte[1024 * 1024];
+
+                                        int bytesRead;
+
+                                        while ((bytesRead = localSocket.getInputStream()
+                                                                       .read(buffer)) !=-1)
+                                        {
+                                            Log.d("Ricardo", "localsocket 建立ws response filestr:" + new String(buffer));
+
+                                            socket.getOutputStream().write(buffer, 0, bytesRead);
+                                        }
+
+                                        socket.getOutputStream().flush();
+
+
+                                        if (isFirstTime)
+                                        {
+                                            isFirstTime = false;
+
+                                            socket.getOutputStream().close();
+
+                                            socket.close();
+
+                                            break;
+                                        }
+
+                                    }
+                                    catch (Exception e)
+                                    {
+                                        Log.d("Ricardo", "exception : " + e.toString());
+
+                                        e.printStackTrace();
+                                    }
                                 }
-                            }.start();
-                        }
-                        else
-                        {
-                            byte[] result = connectToWebViewHttp(bytes);
-
-                            socket.getOutputStream().write(result);
-
-                            log("localsocket read bytes:" + new String(result));
-
-                            socket.getOutputStream().close();
-
-                            socket.close();
-                        }
+                            }
+                        }.start();
                     }
-
                 }
                 catch (Exception e)
                 {
@@ -185,6 +247,9 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         httpLoggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
 
         OkHttpClient okHttpClient = new OkHttpClient.Builder().addInterceptor(httpLoggingInterceptor)
+                                                              .readTimeout(30, TimeUnit.SECONDS)
+                                                              .writeTimeout(30, TimeUnit.SECONDS)
+                                                              .callTimeout(30, TimeUnit.SECONDS)
                                                               .build();
 
         okHttpClient.newCall(request)
@@ -205,27 +270,40 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
                             if (!TextUtils.isEmpty(debugInfoStr) && debugInfoStr.contains("webSocketDebuggerUrl"))
                             {
-                                log("debugInfoStr != null");
-
                                 String webSocketDebuggerUrl;
 
                                 String jsonStr = debugInfoStr.substring(debugInfoStr.indexOf('{'), debugInfoStr.lastIndexOf('}') + 1);
 
                                 JSONObject object = parseJSONObjectFromString(jsonStr);
 
-                                webSocketDebuggerUrl = getString("webSocketDebuggerUrl", object);
+                                webSocketDebuggerUrl = JSONUtils.getString("webSocketDebuggerUrl", object);
 
                                 log(webSocketDebuggerUrl);
 
                                 //fixme 连接失败，onOpen()、onMessage()、onFailure()未响应
-                                mWebSocketHandler = WebSocketHandler.getInstance(webSocketDebuggerUrl);
+                                mWebSocketHandler = new WebSocketHandler(webSocketDebuggerUrl);
 
                                 mWebSocketHandler.setSocketIOCallBack(new WebSocketCallBack()
                                 {
                                     @Override
                                     public void onOpen()
                                     {
+                                        log("连接成功");
 
+                                        while (true)
+                                        {
+                                            mWebSocketHandler.sendMessage("数据");
+
+                                            try
+                                            {
+                                                Thread.sleep(2000);
+                                            }
+                                            catch (Exception e)
+                                            {
+                                                LogUtils.logd("connectToWebViewWebSocket() exception = " + e.toString());
+                                                e.printStackTrace();
+                                            }
+                                        }
                                     }
 
                                     @Override
@@ -235,25 +313,43 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                         //由mWebSocketReceiveHandler转发到游戏方
                                         log("onMessage");
 
+                                        JSONObject obj = JSONUtils.parseJSONObjectFromString(msg);
 
+                                        //"code" = -1 => 接收远端数据，发送给mWebSocketReceiveHandler
+                                        if (JSONUtils.getInt("code", object) == -1)
+                                        {
+                                            mWebSocketReceiveHandler.getWebSocket().send(msg);
+                                        }
+                                        //"code" != -1 => 从mWebSocketReceiveHandler接收数据， 发送给远端
+                                        else
+                                        {
+
+                                        }
+                                    }
+
+                                    @Override
+                                    public void onMessage(ByteString msg)
+                                    {
+                                        log("onMessage");
                                     }
 
                                     @Override
                                     public void onClose()
                                     {
-
+                                        log("onClose");
                                     }
 
                                     @Override
                                     public void onConnectError(Throwable t)
                                     {
-
+                                        log("连接发生异常");
+                                        log("onFailure throwable = " + t.toString());
                                     }
                                 });
 
                                 mWebSocketHandler.connect();
 
-                                mWebSocketReceiveHandler = WebSocketHandler.getInstance(webSocketDebuggerUrl);
+                                mWebSocketReceiveHandler = new WebSocketHandler("ws://echo.websocket.org");
 
                                 mWebSocketReceiveHandler.setSocketIOCallBack(new WebSocketCallBack()
                                 {
@@ -267,12 +363,24 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                     public void onMessage(String msg)
                                     {
                                         //双向数据传递， 包装协议进行区分
+
+                                        //todo 协议地址尚未确定
+
+//                                        log("onMessage : " + msg);
+
+                                        mWebSocketHandler.getWebSocket().send(msg);
+                                    }
+
+                                    @Override
+                                    public void onMessage(ByteString msg)
+                                    {
+
                                     }
 
                                     @Override
                                     public void onClose()
                                     {
-
+                                        log("onClose");
                                     }
 
                                     @Override
@@ -288,148 +396,104 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     });
     }
 
-    private byte[] connectToWebViewHttp(byte[] requestData)
-    {
-        try
-        {
-            String name = "webview_devtools_remote_" + android.os.Process.myPid();
-
-            //todo 是否有优化空间，不稳定
-            LocalSocket localSocket = new LocalSocket();
-
-            localSocket.connect(new LocalSocketAddress(name));
-
-            Log.d("Ricardo", "localsocket 建立http链接");
-
-            localSocket.getOutputStream().write(requestData);
-
-            localSocket.getOutputStream().flush();
-
-            int length1 = localSocket.getInputStream().available();
-
-            byte[] bytes1 = new byte[length1];
-
-            localSocket.getInputStream().read(bytes1);
-
-            localSocket.close();
-
-            return bytes1;
-        }
-        catch (IOException e)
-        {
-            e.printStackTrace();
-
-            log(e.toString());
-        }
-
-        return null;
-    }
-
-    private void connectToWebViewWebsocket(byte[] requestData, Socket socket)
-    {
-        try
-        {
-            String name = "webview_devtools_remote_" + android.os.Process.myPid();
-
-            LocalSocket localSocket = new LocalSocket();
-
-            localSocket.connect(new LocalSocketAddress(name));
-
-            Log.d("Ricardo", "localsocket 建立ws链接");
-
-            localSocket.getOutputStream().write(requestData);
-
-            localSocket.getOutputStream().flush();
-
-            while (true)
-            {
-                byte[] buffer = new byte[1024];
-
-                int fileSize = 0;
-
-                int bytesRead;
-
-                while ((bytesRead = localSocket.getInputStream().read(buffer)) > 0)
-                {
-                    socket.getOutputStream().write(buffer, 0, bytesRead);
-
-                    socket.getOutputStream().flush();
-
-                    fileSize += bytesRead;
-                }
-
-                Log.d("Ricardo", "localsocket 建立ws response fileSize:"+fileSize);
-
-                if (fileSize <= 0)
-                {
-                    socket.getOutputStream()
-                          .write("111".getBytes());
-
-                    socket.getOutputStream()
-                          .flush();
-                }
-
-                try
-                {
-                    Thread.sleep(2000);
-                }
-                catch (Exception e)
-                {
-                    e.printStackTrace();
-                }
-            }
-        }
-        catch (IOException e)
-        {
-            e.printStackTrace();
-
-            log("connectToWebViewWebsocket exception : " + e.toString());
-        }
-    }
-
-    private JSONObject parseJSONObjectFromString(String json)
-    {
-        JSONObject jsonObj = new JSONObject();
-        if (!TextUtils.isEmpty(json))
-        {
-            try
-            {
-                jsonObj = new JSONObject(json);
-            }
-            catch (JSONException e)
-            {
-                e.printStackTrace();
-
-                log("Exception occured when parsing the json:" + json);
-            }
-        }
-
-        return jsonObj;
-    }
-
-    private String getString(String key, JSONObject object)
-    {
-        String value = "";
-
-        if (object == null)
-        {
-            return value;
-        }
-
-        try
-        {
-            if (object.has(key))
-            {
-                value = object.getString(key);
-            }
-        }
-        catch (JSONException e)
-        {
-            e.printStackTrace();
-        }
-
-        return value;
-    }
+//    private void connectToWebViewWebsocket(Socket socket)
+//    {
+//        try
+//        {
+//
+//            while (true)
+//            {
+//                byte[] buffer = new byte[1024];
+//
+//                int fileSize = 0;
+//
+//                int bytesRead;
+//
+//                while ((bytesRead = localSocket.getInputStream().read(buffer)) > 0)
+//                {
+//                    socket.getOutputStream().write(buffer, 0, bytesRead);
+//
+//                    fileSize += bytesRead;
+//                }
+//
+//                Log.d("Ricardo", "localsocket 建立ws response fileSize:" + fileSize);
+//
+//                if (fileSize <= 0)
+//                {
+//                    socket.getOutputStream()
+//                          .write("111".getBytes());
+//                }
+//            }
+//
+////            while (true)
+////            {
+////                byte[] buffer = new byte[1024];
+////
+////                int fileSize = 0;
+////
+////                int bytesRead;
+////
+////                while ((bytesRead = localSocket.getInputStream()
+////                                               .read(buffer)) > 0)
+////                {
+////                    socket.getOutputStream()
+////                          .write(buffer, 0, bytesRead);
+////
+////                    fileSize += bytesRead;
+////                }
+////
+////                Log.d("Ricardo", "localsocket 建立ws response fileSize:" + fileSize);
+////
+////                if (fileSize <= 0)
+////                {
+////                    socket.getOutputStream()
+////                          .write("111".getBytes());
+////                }
+////            }
+///*            BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+//
+//            bufferedWriter.write("HTTP/1.1 101 Switching Protocols\r\n");
+//
+//            bufferedWriter.write("Upgrade: websocket\r\n");
+//
+//            bufferedWriter.write("Connection: Upgrade\r\n");
+//
+//            bufferedWriter.write("Sec-WebSocket-Accept: EdBp0oJxUeOrNi9+en9P7hb5fA0=\r\n");
+//
+//            bufferedWriter.write("Sec-WebSocket-Protocol: chat\r\n\r\n");
+//
+//            bufferedWriter.flush();
+//
+//            bufferedWriter.close();
+//
+//            socket.close();*/
+//
+//            //                socket.getOutputStream().write("123".getBytes());
+//            //
+//            //                socket.getOutputStream().flush();
+//
+//            //                socket.getOutputStream().close();
+//
+//            //                socket.close();
+//
+//
+//            //                try
+//            //                {
+//            //                    Thread.sleep(2000);
+//            //                }
+//            //                catch (Exception e)
+//            //                {
+//            //                    LogUtils.logd("connectToWebViewWebSocket() exception = " + e.toString());
+//            //                    e.printStackTrace();
+//            //                }
+//            //            }
+//        }
+//
+//        catch (IOException e)
+//        {
+//            e.printStackTrace();
+//        }
+//    }
 
     private void log(String msg)
     {
