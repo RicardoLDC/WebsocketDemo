@@ -119,12 +119,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 {
                     String name = "webview_devtools_remote_" + Process.myPid();
 
-                    localSocket = new LocalSocket();
-
-                    localSocket.connect(new LocalSocketAddress(name));
-
-                    Log.d("Ricardo", "localsocket 建立LocalSocket链接");
-
                     ServerSocket mServerSocket = new ServerSocket(PORT_NUMBER);
 
                     while (true)
@@ -158,9 +152,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                             result[i] = bytes[i];
                         }
 
+                        localSocket = new LocalSocket();
+
+                        localSocket.connect(new LocalSocketAddress(name));
+
+                        Log.d("Ricardo", "localsocket 建立LocalSocket链接");
+
                         localSocket.getOutputStream().write(result);
 
-//                        Log.d("Ricardo", "localsocket 建立ws request size:" + fileSize);
+
+                        Log.d("Ricardo", "localsocket 建立ws request str:" + new String(result));
 //
 //                        if (fileSize == 0)
 //                        {
@@ -198,6 +199,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                             socket.getOutputStream().close();
 
                                             socket.close();
+
+                                            localSocket.close();
 
                                             break;
                                         }
