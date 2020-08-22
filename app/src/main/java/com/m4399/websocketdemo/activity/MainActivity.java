@@ -18,14 +18,17 @@ import com.m4399.websocketdemo.R;
 import com.m4399.websocketdemo.WebSocketHandler;
 import com.m4399.websocketdemo.interfaces.WebSocketCallBack;
 import com.m4399.websocketdemo.utils.JSONUtils;
-import com.m4399.websocketdemo.utils.LogUtils;
 import com.tencent.smtt.utils.ByteUtils;
 
+import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
 import androidx.annotation.RequiresApi;
@@ -126,82 +129,96 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     {
                         Socket socket = mServerSocket.accept();
 
-                        Log.d("Ricardo", "tcp 建立链接");
-
-                        byte[] bytes = new byte[512];
-
-                        int bytesRead;
-
-                        int fileSize = 0;
-
-//                        while ((bytesRead = socket.getInputStream().read(bytes)) != -1)
-//                        {
-//                            localSocket.getOutputStream().write(bytes, 0, bytesRead);
-//
-//                            Log.d("Ricardo", "localsocket 建立ws request bytesRead:" + bytesRead);
-//
-//                            fileSize += bytesRead;
-//                        }
-
-
-                        int size = socket.getInputStream().read(bytes);
-
-                        byte[] result = ByteUtils.subByte(bytes, 0, size);
-
-                        localSocket = new LocalSocket();
-
-                        localSocket.connect(new LocalSocketAddress(name));
-
-                        Log.d("Ricardo", "localsocket 建立LocalSocket链接");
-
-                        localSocket.getOutputStream().write(result);
-
-
-                        Log.d("Ricardo", "localsocket 建立ws request str:" + new String(result));
-
                         new Thread()
                         {
                             @Override
                             public void run()
                             {
-                                while (true)
+                                while (!socket.isClosed())
                                 {
                                     try
                                     {
-                                        byte[] buffer = new byte[1024 * 1024];
+                                        Log.d("Ricardo", "tcp 建立链接");
 
-                                        int bytesRead;
+                                        byte[] bytes = new byte[1024 * 64];
 
-                                        while ((bytesRead = localSocket.getInputStream().read(buffer)) !=-1)
-                                        {
-                                            Log.d("Ricardo", "localsocket 建立ws response filestr:" + new String(buffer));
+                                        int size = socket.getInputStream()
+                                                         .read(bytes);
 
-                                            socket.getOutputStream().write(buffer, 0, bytesRead);
-                                        }
+                                        Log.d("Ricardo", "size = " + size);
 
-                                        socket.getOutputStream().flush();
+                                        byte[] result = ByteUtils.subByte(bytes, 0, size);
 
+                                        Log.d("Ricardo", "读取内容 ：" + new String(result));
 
-                                        if (isFirstTime)
-                                        {
-                                            isFirstTime = false;
+                                        localSocket = new LocalSocket();
 
-                                            socket.getOutputStream().close();
+                                        localSocket.connect(new LocalSocketAddress(name));
 
-                                            socket.close();
+                                        Log.d("Ricardo", "localsocket 建立LocalSocket链接");
 
-                                            localSocket.close();
+                                        localSocket.getOutputStream()
+                                                   .write(result);
 
-                                            break;
-                                        }
+                                        Log.d("Ricardo", "localsocket 建立ws request str:" + new String(result));
+//                                        connectToLocalSocket(socket);
 
                                     }
-                                    catch (Exception e)
+                                    catch (IOException e)
                                     {
-                                        Log.d("Ricardo", "exception : " + e.toString());
+                                        Log.d("Ricardo", Log.getStackTraceString(e));
 
                                         e.printStackTrace();
                                     }
+
+                                    new Thread()
+                                    {
+                                        @Override
+                                        public void run()
+                                        {
+                                            while (true)
+                                            {
+                                                try
+                                                {
+                                                    byte[] buffer = new byte[1024 * 1024];
+
+                                                    int bytesRead;
+
+                                                    while (localSocket != null && (bytesRead = localSocket.getInputStream().read(buffer)) != -1)
+                                                    {
+                                                        Log.d("Ricardo",
+                                                              "localsocket 建立ws response filestr:" + new String(
+                                                                      ByteUtils.subByte(buffer, 0,
+                                                                                        bytesRead)));
+
+                                                        socket.getOutputStream()
+                                                              .write(buffer, 0, bytesRead);
+                                                    }
+
+                                                    if (isFirstTime)
+                                                    {
+                                                        isFirstTime = false;
+
+                                                        socket.getOutputStream()
+                                                              .close();
+
+                                                        socket.close();
+
+                                                        localSocket.close();
+
+                                                        break;
+                                                    }
+
+                                                }
+                                                catch (Exception e)
+                                                {
+                                                    Log.d("Ricardo", Log.getStackTraceString(e));
+
+                                                    e.printStackTrace();
+                                                }
+                                            }
+                                        }
+                                    }.start();
                                 }
                             }
                         }.start();
@@ -217,6 +234,50 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }.start();
 
         mFlContainer.addView(mWebView);
+    }
+
+    private void connectToLocalSocket(Socket socket)
+    {
+        String name = "webview_devtools_remote_" + Process.myPid();
+
+        try
+        {
+            Log.d("Ricardo", "tcp 建立链接");
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(),
+                                                                             StandardCharsets.UTF_8));
+
+            StringBuilder sb = new StringBuilder();
+
+            String line;
+
+            while ((line = reader.readLine()) != null)
+            {
+                sb.append(line);
+            }
+
+            Log.d("Ricardo", "content = " + sb.toString());
+
+            byte[] result = sb.toString().getBytes(StandardCharsets.UTF_8);
+
+            Log.d("Ricardo", "读取内容 ：" + new String(result));
+
+            localSocket = new LocalSocket();
+
+            localSocket.connect(new LocalSocketAddress(name));
+
+            Log.d("Ricardo", "localsocket 建立LocalSocket链接");
+
+            localSocket.getOutputStream()
+                       .write(result);
+
+            Log.d("Ricardo", "localsocket 建立ws request str:" + new String(result));
+        }
+        catch (IOException e)
+        {
+            Log.d("Ricardo", Log.getStackTraceString(e));
+            e.printStackTrace();
+        }
     }
 
     private Request request;
@@ -282,20 +343,41 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                                     {
                                         log("连接成功");
 
-                                        while (true)
+                                        try
                                         {
-                                            mWebSocketHandler.sendMessage("数据");
+                                            JSONObject object = new JSONObject();
 
-                                            try
-                                            {
-                                                Thread.sleep(2000);
-                                            }
-                                            catch (Exception e)
-                                            {
-                                                LogUtils.logd("connectToWebViewWebSocket() exception = " + e.toString());
-                                                e.printStackTrace();
-                                            }
+                                            object.put("type", 1);
+
+                                            object.put("message", "123456789");
+
+                                            mWebSocketHandler.sendMessage(object.toString());
                                         }
+                                        catch (JSONException e)
+                                        {
+                                            Log.d("Ricardo", Log.getStackTraceString(e));
+
+                                            e.printStackTrace();
+                                        }
+
+//                                        mWebSocketHandler.sendMessage("123456789\n");
+
+//                                        Log.d("Ricardo", "发送数据 ：" + "123456789");
+
+//                                        while (true)
+//                                        {
+//                                            mWebSocketHandler.sendMessage("i");
+//
+//                                            try
+//                                            {
+//                                                Thread.sleep(2000);
+//                                            }
+//                                            catch (Exception e)
+//                                            {
+//                                                LogUtils.logd("connectToWebViewWebSocket() exception = " + e.toString());
+//                                                e.printStackTrace();
+//                                            }
+//                                        }
                                     }
 
                                     @Override
