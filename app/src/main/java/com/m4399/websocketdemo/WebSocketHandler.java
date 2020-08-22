@@ -26,7 +26,7 @@ import okio.ByteString;
  *
  * Copyright (c) 2020年, 4399 Network CO.ltd. All Rights Reserved.
  */
-public class WebSocketHandler extends WebSocketListener
+public class WebSocketHandler
 {
     private String wsUrl;
 
@@ -40,7 +40,6 @@ public class WebSocketHandler extends WebSocketListener
                                                   .readTimeout(3, TimeUnit.SECONDS)
                                                   .writeTimeout(3, TimeUnit.SECONDS)
                                                   .connectTimeout(3, TimeUnit.SECONDS)
-                                                  .pingInterval(30, TimeUnit.SECONDS)
                                                   .build();
 
     public WebSocketHandler(String wsUrl)
@@ -85,9 +84,9 @@ public class WebSocketHandler extends WebSocketListener
         //构造request对象
         Request request = new Request.Builder().url(wsUrl).build();
 
-//        CustomWebsocketListener socketListener = new CustomWebsocketListener();
+        CustomWebsocketListener socketListener = new CustomWebsocketListener();
 
-        mWebSocket = client.newWebSocket(request, WebSocketHandler.this);
+        mWebSocket = client.newWebSocket(request, socketListener);
 
         client.dispatcher().executorService().shutdown();
 
@@ -109,180 +108,91 @@ public class WebSocketHandler extends WebSocketListener
         Log.d("Ricardo", text);
     }
 
-    @Override
-    public void onOpen(WebSocket webSocket, Response response)
+    private class CustomWebsocketListener extends WebSocketListener
     {
-        super.onOpen(webSocket, response);
-
-        mWebSocket = webSocket;
-
-//        LogUtils.logd("" + mWebSocket.queueSize());
-//
-//        LogUtils.logd(mWebSocket.send("welcome") ? "true" : "false");
-//
-//        LogUtils.logd("" + mWebSocket.queueSize());
-
-        if (mSocketIOCallBack != null)
+        @Override
+        public void onOpen(WebSocket webSocket, Response response)
         {
-            mSocketIOCallBack.onOpen();
+            super.onOpen(webSocket, response);
+
+            mWebSocket = webSocket;
+
+            mWebSocket.send("welcome");
+
+            if (mSocketIOCallBack != null)
+            {
+                mSocketIOCallBack.onOpen();
+            }
+            else
+            {
+                log("mSocketIOCallBack = null");
+            }
         }
-        else
+
+        @Override
+        public void onMessage(WebSocket webSocket, String text)
         {
-            log("mSocketIOCallBack = null");
+            super.onMessage(webSocket, text);
+
+            log("onMessage");
+
+            log("onMessage text = " + text);
+
+            if (mSocketIOCallBack != null)
+            {
+                mSocketIOCallBack.onMessage(text);
+            }
+        }
+
+        @Override
+        public void onMessage(WebSocket webSocket, ByteString bytes)
+        {
+            super.onMessage(webSocket, bytes);
+
+            if (mSocketIOCallBack != null)
+            {
+                mSocketIOCallBack.onMessage(bytes);
+            }
+        }
+
+        @Override
+        public void onClosing(WebSocket webSocket, int code, String reason)
+        {
+            super.onClosing(webSocket, code, reason);
+
+            log("onClosing");
+
+            log("onClosing code = " + code + " , reason = " + reason);
+        }
+
+        @Override
+        public void onClosed(WebSocket webSocket, int code, String reason)
+        {
+            super.onClosed(webSocket, code, reason);
+
+            log("onOpen");
+
+            if (mSocketIOCallBack != null)
+            {
+                mSocketIOCallBack.onClose();
+            }
+        }
+
+        @Override
+        public void onFailure(WebSocket webSocket, Throwable t, Response response)
+        {
+            super.onFailure(webSocket, t, response);
+
+            log("WebSocketHandler onFailure = " + t.toString());
+
+            if (mSocketIOCallBack != null)
+            {
+                mSocketIOCallBack.onConnectError(t);
+            }
+            else
+            {
+                log("mSocketIOCallBack = null");
+            }
         }
     }
-
-    @Override
-    public void onMessage(WebSocket webSocket, String text)
-    {
-        super.onMessage(webSocket, text);
-
-        log("onMessage");
-
-        if (mSocketIOCallBack != null)
-        {
-            mSocketIOCallBack.onMessage(text);
-        }
-    }
-
-    @Override
-    public void onMessage(WebSocket webSocket, ByteString bytes)
-    {
-        super.onMessage(webSocket, bytes);
-
-        if (mSocketIOCallBack != null)
-        {
-            mSocketIOCallBack.onMessage(bytes);
-        }
-    }
-
-    @Override
-    public void onClosing(WebSocket webSocket, int code, String reason)
-    {
-        super.onClosing(webSocket, code, reason);
-
-        log("onClosing");
-
-        log("onClosing code = " + code + " , reason = " + reason);
-    }
-
-    @Override
-    public void onClosed(WebSocket webSocket, int code, String reason)
-    {
-        super.onClosed(webSocket, code, reason);
-
-        log("onOpen");
-
-        if (mSocketIOCallBack != null)
-        {
-            mSocketIOCallBack.onClose();
-        }
-    }
-
-    @Override
-    public void onFailure(WebSocket webSocket, Throwable t, Response response)
-    {
-        super.onFailure(webSocket, t, response);
-
-        log("onFailure :" + t.toString());
-
-        if (mSocketIOCallBack != null)
-        {
-            mSocketIOCallBack.onConnectError(t);
-        }
-        else
-        {
-            log("mSocketIOCallBack = null");
-        }
-    }
-
-//    private class CustomWebsocketListener extends WebSocketListener
-//    {
-//        @Override
-//        public void onOpen(WebSocket webSocket, Response response)
-//        {
-//            super.onOpen(webSocket, response);
-//
-//            mWebSocket = webSocket;
-//
-//            LogUtils.logd("" + mWebSocket.queueSize());
-//
-//            mWebSocket.send("welcome");
-//
-//            LogUtils.logd("" + mWebSocket.queueSize());
-//
-//            if (mSocketIOCallBack != null)
-//            {
-//                mSocketIOCallBack.onOpen();
-//            }
-//            else
-//            {
-//                log("mSocketIOCallBack = null");
-//            }
-//        }
-//
-//        @Override
-//        public void onMessage(WebSocket webSocket, String text)
-//        {
-//            super.onMessage(webSocket, text);
-//
-//            log("onMessage");
-//
-//            if (mSocketIOCallBack != null)
-//            {
-//                mSocketIOCallBack.onMessage(text);
-//            }
-//        }
-//
-//        @Override
-//        public void onMessage(WebSocket webSocket, ByteString bytes)
-//        {
-//            super.onMessage(webSocket, bytes);
-//
-//            if (mSocketIOCallBack != null)
-//            {
-//                mSocketIOCallBack.onMessage(bytes);
-//            }
-//        }
-//
-//        @Override
-//        public void onClosing(WebSocket webSocket, int code, String reason)
-//        {
-//            super.onClosing(webSocket, code, reason);
-//
-//            log("onClosing");
-//
-//            log("onClosing code = " + code + " , reason = " + reason);
-//        }
-//
-//        @Override
-//        public void onClosed(WebSocket webSocket, int code, String reason)
-//        {
-//            super.onClosed(webSocket, code, reason);
-//
-//            log("onOpen");
-//
-//            if (mSocketIOCallBack != null)
-//            {
-//                mSocketIOCallBack.onClose();
-//            }
-//        }
-//
-//        @Override
-//        public void onFailure(WebSocket webSocket, Throwable t, Response response)
-//        {
-//            super.onFailure(webSocket, t, response);
-//
-//            log("onFailure");
-//
-//            if (mSocketIOCallBack != null)
-//            {
-//                mSocketIOCallBack.onConnectError(t);
-//            }
-//            else
-//            {
-//                log("mSocketIOCallBack = null");
-//            }
-//        }
-//    }
 }
